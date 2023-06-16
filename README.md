@@ -166,7 +166,71 @@ The evaluation:
 
 > Using no-sql example with cassandra
 
-![System two - NoSQL database]()
+![System two - NoSQL database](./resources/no-sql-database.png)
+
+> In Functional requirements we chose availability over consistency - we prefer to show users stale data than no data at all. Cassandra extends the concept of eventual consistency by offering tunable consistensy.
+
+**How we store**
+
+We want to build a report that shows the following properties.
+
+> Informational about video
+
+> No. of total views per hour for last several hours
+
+> Information about the channel that the video belongs to
+
+### In SQL relational data bases, MySQL
+
+**video_info**
+
+| videoId | name | ...               | channelId |
+| ------- | ---- | ----------------- | --------- |
+| A       | name | Distributed cache | channelId |
+
+**video_stats**
+
+| videoId | timestamp | count |
+| ------- | --------- | ----- |
+| A       | 15:00     | 2     |
+| A       | 16:00     | 3     |
+| A       | 17:00     | 8     |
+
+**channel_info**
+
+| channelId | name                    | ... |
+| --------- | ----------------------- | --- |
+| 111       | System Design Interview | ..  |
+
+> To generate the report mentioned above, we run a join query that retrieves data from all three tabels. An important property of a relational database is that data is normalized. This simply means we minimize data deplication across different tables eg. we only store video nams on the `video_info` table and do not store it on any other table, because if the video name changes the we have to change in all other tables which can lead to inconsistent data
+
+> Relational system no longer think in terms of nouns, but in terms of **queries** that will be executed in the system we desire, normalization is quite normal
+
+### in NoSQL database (cassandra, logical view)
+
+> Here for same same data above, we strore every thing together. Instead of adding rows like in relational database, we add more columns for every hour
+
+| videoId | cahnnel name            | video name        | 1:00 | 16:00 | 17:00 | ... |
+| ------- | ----------------------- | ----------------- | ---- | ----- | ----- | --- |
+| A       | System Design interview | Distributed Cache | 2    | 3     | 8     | ... |
+
+There are 4 types of NoSQL databases
+
+1. Column eg. HBase, Cassandra,
+1. Document eg. mongodb
+1. Key-Value eg. Rocksdb
+1. Graph eg. Neo4j, AWS Neptune, TigerGraph
+
+> We chose cassandra for our representation of a NoSQL database because it is:
+
+1. Fault tolerant
+1. Scalable, both read-write through put increases linearly as new machines are added
+1. It supports multi data center replication
+1. Works well with time series data
+
+> Remember other NoSQL databases have different architecture and are not like cassandra which is a wide column database that supports asynchronous masterless replication
+
+## 3. Processing service
 
 ## Ingestion path components
 
