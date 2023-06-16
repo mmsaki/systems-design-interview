@@ -232,7 +232,86 @@ There are 4 types of NoSQL databases
 
 ## 3. Processing service
 
-## Ingestion path components
+> Basically, while we get video events we increase view counters
+
+Start with the requirements.
+
+1. How to **scale**?
+1. How to **achieve high throughput**?
+1. How **not to lose data** when processing node crashes?
+1. What to do when **database** is **unavailable** or slow?
+
+Sofware Developer:
+
+> How can I make data processing scalable, reliable and fast?
+
+> Hmmm... Scalability = Partitioning, Reliabile = Replication and checkpointing, Fast = In-memory. Let me see how I can combine all this.
+
+### data aggregation basics
+
+Should we pre-aggregate data in the processing service? Which option is better:
+
+1. Event comes and we increment the counter right away
+   ![Option 1: processing service](./resources/processing-service-1.png)
+
+1. Event come and we accumulate the data in memory for each counter for a period in time then every several seconds we send that value to the database
+
+![Option 2: processing service](./resources/processing-service-2.png)
+
+### Push or Pull?
+
+1. Push means some other service sends events synchronously to the processing service
+1. Pull means the processing service pulls events from some temporary storage
+
+> Although, the answer is that both options are totally valid, and we can make both work, the pull option has more advantages since it provides a better fault tolerance support and is easier to scale
+
+Here is an example:
+
+> If users are pushing events directly to the procession service, if the machine crashes the data will not be sent to the database and be lost. On the otherhand, we can have the processing service pull events from a temporary storage, if the machine fails, we still have data in our temporary storage
+
+![push or pull](./resources/push-or-pull-benefits.png)
+
+**Checkpointing**
+
+Events arrive we put them in storage one by one, in order. Fixed order allows us to assign an offset for each event in the storage. Events are consumed sequentially. While when are progressing we write checkpoint to some persistent storage. If the machine crashes, we can replace it. The new machine will resume where the last machine failed
+
+![check pointing](./resources/checkpointing.png)
+
+> This is a useful concept in stream data processing
+
+**Partitioning**
+
+> Main idea remains the same when applied to event processing
+
+1. Instead of putting all the events into a single queue, let's have several queues
+1. Each queue is independent from the others
+1. Every queue physically lives in it's own machine, and stores a subset of all events ex. we can get a hash of the videoId and use it this hash number to pick a queue
+
+> Partitining allows use to parellalize events processing. More events we get, more partitions we create
+
+![partitioning](./resources/partitioning.png)
+
+### Processing service (detailed design)
+
+1. Processing service reads events from partition one by one, counts it in memory and flushes this values to a database periodically
+1. We need a component that reads events, an infinite loop that pulls data from the partition
+   1. Partion consumer - It reads events and deserializes
+      > Converts byte array into the actual object, usually this consumer component is a single threaded component. Meaning that we have a single thread that reads events. We can implement multi-threaded when several threads read from the partition in parallel. But this comes at a cost. Checkpointing becomes more complicated and It is hard to preserve the order of events.
+      > Pros: Helps to eliminate duplicate events, we can use a distributed cache that stores the unique event identifiers for example the last 10 minutes, it the same messages arrive in the last 10 minute intervals the we only process one of them
+   1. Aggregator
+      1. In-memory store
+   1. Internal queue
+   1. Database writer
+      1. Embeded Database
+      1. Dead-letter queue
+
+![detailed processing service](./resources/detail-processing-service.png)
+
+### Data engestion path
+
+![data ingestion path](./resources/data-ingestion-path.png)
+
+### Ingestion path components
 
 1. Partitioner Service Client
 
@@ -258,15 +337,15 @@ There are 4 types of NoSQL databases
 
    1. Load balancing algorithms e.g
 
-      > a.) round-robin algorithm
+      > round-robin algorithm
 
-      > b.) least connetion algorithm
+      > least connetion algorithm
 
-      > c.) least reponse time algorithm
+      > least reponse time algorithm
 
-      > c.) hash based algorithms
+      > hash based algorithms
 
-      > d.) DNS load balancing
+      > DNS load balancing
 
 1. Partitioner Service Partitions
 
@@ -286,15 +365,15 @@ There are 4 types of NoSQL databases
       > json format - increases message size, because it adds labeling of data
       > protocol buffer
 
-# Data retrieval path
+### Data retrieval path
 
 user -> Browser -> api gateway -> query service -> database (hot storage, cold storage, distributed cache)
 
-# Data flow simulation
+### Data flow simulation
 
 users -> api gateway -> load balancer -> partitioner service -> partitions -> partition consumer -> aggregator -> queue -> database writer -> database -> distrubuted cache -> query service -> user
 
-# Technology stack
+### Technology stack
 
 1. Client-side: Netty, Netflix Hystrix, Polly
 1. Load balancing: NetScaler, NGINX, AWS ELB
@@ -316,7 +395,7 @@ users -> api gateway -> load balancer -> partitioner service -> partitions -> pa
 
 > MurmurHash hashing function while partitioning
 
-# Bottlenecks, tradeoffs
+### Bottlenecks, tradeoffs
 
 1. How to identify bottlenecks
 
@@ -332,7 +411,7 @@ users -> api gateway -> load balancer -> partitioner service -> partitions -> pa
 
 1. What if the processing service cannot keep up with the speed new messages arrive?
 
-# Summary
+## Summary
 
 Functional requirements (API) -> non-functional requirements (qualities, sucure) -> detailed design -> bottlenecks and tradeoffs
 
