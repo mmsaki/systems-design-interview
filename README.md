@@ -7,75 +7,166 @@ Interviewer: Let's design a system that:
 1. Counts YouTubr video views
 1. Counts likes in Facebook/Instagram
 1. Calculates application perfromance metrics
-1. Analyse data in realtime
+1. Analyse data in real-time
 
-**Question to as an interviewee**:
+**Question to ask as an interviewee**:
 
 1. What does data analysis mean?
 1. Who sends that data?
 1. Who uses the results of this analysis?
-1. What does real time really mean?
+1. What does real-time really mean?
 
-**Why requirements clarification is so important**
+**Why requirements clarification is so important?**
 
-> Interviewer: I want to understand how the candidate deals with ambiguity
+> Interviewer wants to understand how the candidate deals with ambiguity
 
-> Interviewer: Why? Because this quality is so important for the daily job
+> Why? Because this quality is so important for the daily job
 
 Sofware Engineer:
 
-> There could be many solution to the problem asked. And, only when we fully understand what features of the system we need to design, we can come up with a proper set of technologies and building blocks.
+> There could be many solution to the problem asked. And, only when I fully understand what features of the system we need to design, I can come up with a proper set of technologies and building blocks
 
-Different engineer with different experiences will use count views
+Different engineers have different experiences and will use different stacks to count views
 
 1. SQL Database (MySQL, PostgresSQL)
 1. NoSQL Database (Cassandra, DynamoDB)
 1. Cache (Redis)
 1. Stream processing (Kafka + Spark)
 1. Cloud native stream processing (Kinesis)
-1. Batch processing (Hdoop MapReduce)
+1. Batch processing (Hadoop MapReduce)
 
-> Each has it's own pros and cons. Only pick those that are address the requirements. You may want to ask more questions. For example, we can use the following categories:
-
-> Users/Customers, Scale (read/write), Performance, Cost
+> Each has it's own pros and cons. Only pick those that address the system requirements. You may want to ask more questions, for example, look at can use the following categories: users & customers, scale, performance, cost.
 
 1. Users/Customers
+
    1. Who will use the system?
-      > _a.) all youtube users, wants to see total views only?, b.) the owner of the videos, wants to per hour stats, c.) a machine learning model, wants to use data to generate recommendations_
-   1. How the sysem will be used?
-      > _a.) marketing department, to generate monthly reports_
+
+      > all youtube users, wants to see only total views?
+
+      > the owner of the videos, wants to see per hour stats of how fast their video is growing
+
+      > a machine learning model, wants to use data to generate recommendations
+
+   1. How the system will be used?
+      > is it marketing department, to generate monthly reports?
+
 1. Scale (read and write)
    1. How many read queries per second?
    1. How much data is queried per request?
    1. How many video views are processed per second by the system?
-   1. Can there be spikes in traffic, and big they may be?
+   1. Can there be spikes in traffic, and how big they may be?
 1. Performance
-   1. What is expected write-to-read data delay? can counts happen an hour later, can we batch process or is realtime data analysis required
+   1. What is the expected write-to-read data delay?
+      > can counts happen an hour later so we can we batch process or do we need real-time data analysis required on the fly
    1. What is expected p99 latency for read queries?
 1. Should the design minimize the cost of development?
 1. Should the design minimize the cost of maintenance?
 
-> Spend a lot of time asking for these requirements. You would rather spend more time trying to find that scope of the question that jumping to solve a more complicated problem that is no where close to the solution being asked.
+> Spend a lot of time asking for these requirements. You would rather spend more time trying to find the scope of the question than jumping to solve a more complicated problem that is no where close to the solution.
 
 ## 1. Functional requirements - API
 
-Things the system has to do, the system has to count video view events so:
+What things the system has to do, the system has to count video view events so:
 
-- `countViewEvent(videoId)`
-- `countEvent(videoId, eventType)`
-  > where event type parameter could be of **views, likes, shares**
-- `processEvent(videoId, eventType, function)`
-  > where function is of **count, sum, average**
-- `processEvents(listOfEvents)`
-  > generalize, by allowing system to not process one by one but can batch a list (containing an object with details of requests) of events and process them
+1. `countViewEvent(videoId)`
+1. `countEvent(videoId, eventType)`
+   > where event type parameter could be of **views, likes, shares**
+1. `processEvent(videoId, eventType, function)`
+   > where function is of **count, sum, average**
+1. `processEvents(listOfEvents)`
+   > generalize, by allowing system to not process one by one but can batch a list (containing an object with details of requests) of events and process them
 
-Data reviews, the system has to return video view count for a **time period**:
+What data can be retirved? ex. the system has to return video view count for a **time period**:
 
-- `getViewsCount(videoId, startTime, endTime)`
-- `getCount(videoId, eventType, startTime, endTime)`
-- `getStats(videoId, eventType, function, startTime, endTime)`
+1. `getViewsCount(videoId, startTime, endTime)`
+1. `getCount(videoId, eventType, startTime, endTime)`
+1. `getStats(videoId, eventType, function, startTime, endTime)`
 
-> This allows use to create our api and generalize it
+> We can use functional requirements to create our api and generalize it it's usage and make several iterations to generalize the api
+
+## 2. Non-Functional requirements
+
+> The interviewer might challenge us with questions ex. Let's design a system that can handle YouTube scale & let's try to make it as fast as possible
+
+Sofware Developer:
+
+> CAP Theorem tells me I should be choosing between availability and consistencu, I will go with availability
+
+1. Scalable
+   > Tens of thousands of video views per second
+1. Highly Performant
+   > few tens of milliseconds to return total views count for a video
+1. Highly Available
+   > Survives hardware/networkk failures, no single point of failure
+
+## 3. High-level architechture
+
+**Let's start with something simple**
+
+user <- browser <- processing service <- database -> query service -> browser -> user
+
+Interview:
+
+> I have so many questions, where should I start?
+
+Software Developer:
+
+> I should betterbe driving this conversation. Otherwise, I may quickly become lost in questions. And the first thing I want to do is understand what data we need to store and how we do it
+
+1. We need to define a data model, what we store
+
+   1. Individual events e.g every click with other details like timestamp, country
+      > Pros: Fast writes, can slice and dice data however we need, can recalculate numbers if needed
+      > Cons: Slow reads, Costly for a large scale eg. many events
+   1. Aggregate data e.g per minute, in real-time
+      > Pros: Fast reads
+      > Cons: Requires data aggregation pipeline eg. very hard to fix bugs when they happen
+
+   > It is hard to pick one. So ask the interviewer what is important. It might be better to use both. However the draw back of using both is that it will be costly but highly beneficials.
+
+Interviwer:
+
+> Can you please give me a specific database name and explain your choice?
+
+Software developer:
+
+> I know that both SQL and NoSQL databases can scale and perform well. Let me evaluate both types.
+
+The evaluation:
+
+> How to **scale writes**?
+
+> How to **scale reads**?
+
+> How to make bith **writes** and **reads fast**?
+
+> How **not to lose data** in case of hardware faults and network partitions?
+
+> How to achieve **strong consistency**?
+
+> What are the tradeoffs?
+
+> How to **recover data** in case of outage?
+
+> How to unsure **data security**?
+
+> How to make it **extensible** for data model changes in the future?
+
+> Where to run **cloud** vs **on-promises** data centers?
+
+> How much money will it all **cost**?
+
+**SQL database, MySQL**
+
+(Processing service, Query service) -> cluster proxy -> (shard proxy -> MySQL shardA-M, shard proxy -> MySQL shardN-Z) -> (Read Replica incase of outage)
+
+> this is similar to what youtube uses for system design
+
+![Youtube system design](./resources/system-design.png)
+
+> Using no-sql example with cassandra
+
+![System two - NoSQL database]()
 
 ## Ingestion path components
 
